@@ -1,0 +1,518 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+  <meta charset="UTF-8">
+  <title>Country Explorer</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <!-- Bootstrap 5 CSS (CDN) -->
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css">
+  <!-- Chart.js (CDN) -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <style>
+    /* Layout base e impostazioni */
+    html, body {
+      height: 100%;
+      margin: 0;
+      padding: 0;
+      font-family: Arial, sans-serif;
+    }
+    .wrapper {
+      min-height: 100%;
+      display: flex;
+      flex-direction: column;
+    }
+    .content {
+      flex: 1;
+      padding: 20px;
+    }
+    /* Temi */
+    body.day {
+      background-color: #f8f9fa;
+      color: #212529;
+    }
+    body.night {
+      background-color: #212529;
+      color: #f8f9fa;
+    }
+    header, footer {
+      background-color: #333;
+      color: #fff;
+      text-align: center;
+      padding: 15px;
+    }
+    .container-main {
+      max-width: 960px;
+      margin: 0 auto;
+      padding: 15px;
+    }
+    /* Ricerca */
+    .search-controls {
+      text-align: center;
+      margin-bottom: 20px;
+    }
+    .search-controls input[type="text"] {
+      width: 60%;
+      max-width: 500px;
+      padding: 8px;
+      margin-right: 10px;
+      border: 1px solid #ccc;
+      border-radius: 4px;
+    }
+    .search-controls button {
+      margin: 0 5px;
+    }
+    /* Menu Continente */
+    #continentMenu {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+      justify-content: center;
+      margin-bottom: 20px;
+    }
+    #continentMenu button {
+      padding: 6px 10px;
+      border: none;
+      background-color: #007bff;
+      color: #fff;
+      border-radius: 4px;
+      cursor: pointer;
+      font-size: 0.9rem;
+    }
+    #continentMenu button.active {
+      background-color: #0056b3;
+    }
+    /* Controlli di Ordinamento */
+    .controls {
+      text-align: center;
+      margin-bottom: 20px;
+    }
+    .controls button {
+      margin: 0 5px;
+    }
+    /* Card Paese */
+    .country-card {
+      margin-bottom: 20px;
+      padding: 15px;
+      background-color: #fff;
+      border: 1px solid #dee2e6;
+      border-radius: 4px;
+      box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+    }
+    .country-card img {
+      max-width: 120px;
+      border-radius: 5px;
+      margin-right: 15px;
+    }
+    .country-card .card-body {
+      flex: 1;
+    }
+    .country-card h4 {
+      margin: 0 0 10px;
+    }
+    .country-card p {
+      margin: 0 0 5px;
+      font-size: 0.95rem;
+    }
+    body.night .country-card {
+      background-color: #343a40;
+      border-color: #495057;
+      color: #f8f9fa;
+    }
+    body.night .modal-content {
+      background-color: #343a40;
+      color: #f8f9fa;
+    }
+    /* Grafico */
+    #chartContainer {
+      margin-bottom: 20px;
+      position: relative;
+      height: 300px;
+    }
+    /* Paginazione */
+    #paginationContainer {
+      margin-top: 20px;
+      text-align: center;
+    }
+    footer {
+      font-size: 0.9rem;
+    }
+  </style>
+</head>
+<body class="day">
+  <div class="wrapper">
+    <!-- HEADER con Toggle Tema -->
+    <header>
+      <div class="container d-flex justify-content-between align-items-center">
+        <h1 class="m-0">Country Explorer</h1>
+        <div>
+          <label for="themeToggle" class="form-check-label me-2">Tema</label>
+          <input type="checkbox" id="themeToggle" class="form-check-input">
+          <span id="themeText">Day</span>
+        </div>
+      </div>
+    </header>
+  
+    <!-- CONTENUTO -->
+    <div class="content container-main">
+      <!-- Sezione di Ricerca -->
+      <div class="search-controls mb-4">
+        <input type="text" id="queryInput" placeholder="Cerca Paese per Nome...">
+        <button id="btnSearch" class="btn btn-primary">Cerca</button>
+        <button id="btnAll" class="btn btn-success">Tutti i Paesi</button>
+      </div>
+      
+      <!-- Menu Continente -->
+      <div id="continentMenu" class="mb-3"></div>
+      
+      <!-- Controlli di Ordinamento -->
+      <div class="controls mb-4">
+        <button id="btnSortName" class="btn btn-info">Ordina per Nome</button>
+        <button id="btnSortPopulation" class="btn btn-warning">Ordina per Popolazione</button>
+      </div>
+      
+      <!-- Grafico a Barre -->
+      <div id="chartContainer" class="mb-4">
+        <canvas id="popChart"></canvas>
+      </div>
+      
+      <!-- Lista dei Paesi in Card -->
+      <div id="countriesContainer"></div>
+      
+      <!-- Paginazione -->
+      <nav>
+        <ul id="paginationContainer" class="pagination justify-content-center"></ul>
+      </nav>
+    </div>
+  
+    <!-- FOOTER -->
+    <footer>
+      <p>Realizzato da Bocaletto Luca © <span id="currentYear"></span></p>
+    </footer>
+  </div>
+  
+  <!-- MODALE per i Dettagli del Paese -->
+  <div class="modal fade" id="detailModal" tabindex="-1" aria-labelledby="detailModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-lg modal-dialog-centered">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h5 class="modal-title" id="detailModalLabel">Dettaglio Paese</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Chiudi"></button>
+        </div>
+        <div class="modal-body" id="modalBodyContent">
+          <!-- I dettagli del paese verranno caricati qui -->
+        </div>
+      </div>
+    </div>
+  </div>
+  
+  <!-- Bootstrap Bundle JS (CDN) -->
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+  <script>
+    document.addEventListener("DOMContentLoaded", function() {
+      // Imposta l'anno nel footer
+      document.getElementById("currentYear").textContent = new Date().getFullYear();
+
+      /* ----- Toggle Tema Day/Night ----- */
+      const themeToggle = document.getElementById("themeToggle");
+      const themeText = document.getElementById("themeText");
+      themeToggle.addEventListener("change", function() {
+        if(this.checked) {
+          document.body.classList.remove("day");
+          document.body.classList.add("night");
+          themeText.textContent = "Night";
+        } else {
+          document.body.classList.remove("night");
+          document.body.classList.add("day");
+          themeText.textContent = "Day";
+        }
+      });
+
+      /* ----- Variabili Globali ----- */
+      let allCountries = [];
+      let filteredCountries = [];
+      let currentSortedCountries = [];
+      let searchQuery = "";
+      let activeContinent = "ALL";  // It is the continent filter
+      let currentPage = 1;
+      let pageSize = 20;
+      let orderOption = "name";  // "name" oppure "population"
+      let popChart;
+      
+      const countriesContainer = document.getElementById("countriesContainer");
+      const paginationContainer = document.getElementById("paginationContainer");
+      const continentMenu = document.getElementById("continentMenu");
+
+      /* ----- Carica Tutti i Paesi dalla REST Countries API ----- */
+      async function loadCountries() {
+        try {
+          const response = await fetch("https://restcountries.com/v3.1/all");
+          if (!response.ok) throw new Error("Errore nel caricamento dei paesi: " + response.status);
+          const data = await response.json();
+          allCountries = data;
+          // Reset filtri
+          searchQuery = "";
+          activeContinent = "ALL";
+          filteredCountries = allCountries.slice();
+          orderOption = "name";
+          currentPage = 1;
+          generateContinentMenu();
+          applyFilters();
+        } catch (error) {
+          console.error(error);
+          countriesContainer.innerHTML = `<div class="alert alert-danger">${error.message}</div>`;
+        }
+      }
+      
+      /* ----- Genera il Menu per il Filtro per Continente ----- */
+      function generateContinentMenu() {
+        // Estrai i nomi dei continenti (region)
+        let continentsSet = new Set();
+        allCountries.forEach(country => {
+          if(country.region) {
+            continentsSet.add(country.region);
+          }
+        });
+        let continents = Array.from(continentsSet).sort();
+        // Costruisci i pulsanti: inizia con "ALL"
+        continentMenu.innerHTML = "";
+        const allBtn = document.createElement("button");
+        allBtn.textContent = "ALL";
+        allBtn.classList.add("active");
+        allBtn.addEventListener("click", function() {
+          activeContinent = "ALL";
+          setActiveContinentButton("ALL");
+          applyFilters();
+        });
+        continentMenu.appendChild(allBtn);
+        continents.forEach(continent => {
+          const btn = document.createElement("button");
+          btn.textContent = continent;
+          btn.addEventListener("click", function() {
+            activeContinent = continent;
+            setActiveContinentButton(continent);
+            applyFilters();
+          });
+          continentMenu.appendChild(btn);
+        });
+      }
+      
+      function setActiveContinentButton(activeName) {
+        const buttons = continentMenu.querySelectorAll("button");
+        buttons.forEach(btn => {
+          if (btn.textContent === activeName) {
+            btn.classList.add("active");
+          } else {
+            btn.classList.remove("active");
+          }
+        });
+      }
+      
+      /* ----- Applica Filtri: ricerca e continente ----- */
+      function applyFilters() {
+        let temp = allCountries.slice();
+        if(searchQuery.length > 0) {
+          temp = temp.filter(country => country.name?.common.toLowerCase().includes(searchQuery));
+        }
+        if(activeContinent !== "ALL") {
+          temp = temp.filter(country => country.region === activeContinent);
+        }
+        filteredCountries = temp;
+        updateDisplay();
+      }
+      
+      /* ----- Aggiorna la Visualizzazione: Ordinamento, Paginazione, Grafico ----- */
+      function updateDisplay() {
+        // Ordina i risultati
+        let temp = filteredCountries.slice();
+        if(orderOption === "name") {
+          temp.sort((a, b) => a.name.common.localeCompare(b.name.common));
+        } else if(orderOption === "population") {
+          temp.sort((a, b) => b.population - a.population);
+        }
+        currentSortedCountries = temp;
+        currentPage = 1;
+        renderCountries();
+        generatePagination();
+        updateChart();
+      }
+      
+      /* ----- Renderizza le Card dei Paesi ----- */
+      function renderCountries() {
+        countriesContainer.innerHTML = "";
+        const startIdx = (currentPage - 1) * pageSize;
+        const pageData = currentSortedCountries.slice(startIdx, startIdx + pageSize);
+        if(pageData.length === 0) {
+          countriesContainer.innerHTML = "<p class='text-center'>Nessun paese trovato.</p>";
+          return;
+        }
+        pageData.forEach(country => {
+          const name = country.name?.common || "N/D";
+          const flag = country.flags?.png || "";
+          const capital = country.capital ? country.capital[0] : "Sconosciuta";
+          const region = country.region || "Sconosciuta";
+          const population = country.population ? country.population.toLocaleString() : "N/D";
+          const card = document.createElement("div");
+          card.className = "country-card row";
+          card.innerHTML = `
+            <div class="col-md-3">
+              ${ flag ? `<img src="${flag}" alt="${escapeHtml(name)}" class="img-fluid">` : `<div class="bg-secondary text-white p-3">No Image</div>` }
+            </div>
+            <div class="col-md-9">
+              <div class="card-body">
+                <h4>${escapeHtml(name)}</h4>
+                <p><strong>Capitale:</strong> ${escapeHtml(capital)}</p>
+                <p><strong>Regione:</strong> ${escapeHtml(region)}</p>
+                <p><strong>Popolazione:</strong> ${population}</p>
+                <button class="btn btn-sm btn-secondary" onclick="loadCountryDetails('${country.cca3}')">Leggi di più</button>
+              </div>
+            </div>
+          `;
+          countriesContainer.appendChild(card);
+        });
+      }
+      
+      /* ----- Genera Paginazione ----- */
+      function generatePagination() {
+        const totalPages = Math.ceil(currentSortedCountries.length / pageSize);
+        let html = "";
+        if(totalPages <= 1) {
+          paginationContainer.innerHTML = "";
+          return;
+        }
+        html += `<li class="page-item ${currentPage === 1 ? "disabled" : ""}">
+                   <a class="page-link" href="#" onclick="changePage(${currentPage - 1})">Prev</a>
+                 </li>`;
+        for(let i = 1; i <= totalPages; i++) {
+          html += `<li class="page-item ${currentPage === i ? "active" : ""}">
+                     <a class="page-link" href="#" onclick="changePage(${i})">${i}</a>
+                   </li>`;
+        }
+        html += `<li class="page-item ${currentPage === totalPages ? "disabled" : ""}">
+                   <a class="page-link" href="#" onclick="changePage(${currentPage + 1})">Next</a>
+                 </li>`;
+        paginationContainer.innerHTML = html;
+      }
+      
+      window.changePage = function(page) {
+        currentPage = page;
+        renderCountries();
+        generatePagination();
+      }
+      
+      /* ----- Aggiorna il Grafico (Top 10 per Popolazione) ----- */
+      function updateChart() {
+        const top10 = currentSortedCountries.slice().sort((a, b) => b.population - a.population).slice(0,10);
+        const labels = top10.map(country => {
+          let n = country.name.common;
+          return n.length > 20 ? n.substring(0,20) + "..." : n;
+        });
+        const dataArr = top10.map(country => country.population);
+        const ctx = document.getElementById("popChart").getContext("2d");
+        if(popChart instanceof Chart) {
+          popChart.destroy();
+        }
+        popChart = new Chart(ctx, {
+          type: "bar",
+          data: {
+            labels: labels,
+            datasets: [{
+              label: "Popolazione",
+              data: dataArr,
+              backgroundColor: "rgba(75, 192, 192, 0.6)",
+              borderColor: "rgba(75, 192, 192, 1)",
+              borderWidth: 1
+            }]
+          },
+          options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            scales: { y: { beginAtZero: true } }
+          }
+        });
+      }
+      
+      /* ----- Ricerca Paesi per Nome ----- */
+      document.getElementById("btnSearch").addEventListener("click", function() {
+        searchQuery = document.getElementById("queryInput").value.trim().toLowerCase();
+        applyFilters();
+      });
+      
+      document.getElementById("btnAll").addEventListener("click", function() {
+        document.getElementById("queryInput").value = "";
+        searchQuery = "";
+        activeContinent = "ALL";
+        setActiveContinentButton("ALL");
+        applyFilters();
+      });
+      
+      /* ----- Applica Filtri Combinati ----- */
+      function applyFilters() {
+        let temp = allCountries.slice();
+        if(searchQuery.length > 0) {
+          temp = temp.filter(country => country.name?.common.toLowerCase().includes(searchQuery));
+        }
+        if(activeContinent !== "ALL") {
+          temp = temp.filter(country => country.region === activeContinent);
+        }
+        filteredCountries = temp;
+        updateDisplay();
+      }
+      
+      /* ----- Carica Dettagli del Paese e Mostra in Modale ----- */
+      window.loadCountryDetails = async function(cca3) {
+        try {
+          const response = await fetch("https://restcountries.com/v3.1/alpha/" + cca3);
+          if(!response.ok) throw new Error("Errore nel caricamento dei dettagli: " + response.status);
+          const data = await response.json();
+          const country = data[0];
+          const name = country.name?.common || "N/D";
+          const capital = country.capital ? country.capital[0] : "Sconosciuta";
+          const region = country.region || "Sconosciuta";
+          const subregion = country.subregion || "Sconosciuta";
+          const population = country.population ? country.population.toLocaleString() : "N/D";
+          const area = country.area ? country.area + " km²" : "N/D";
+          const languages = country.languages ? Object.values(country.languages).join(", ") : "Non specificate";
+          const currencies = country.currencies ? Object.values(country.currencies).map(c => c.name).join(", ") : "Non specificate";
+          const flag = country.flags?.png || "";
+          let html = `<h2>${escapeHtml(name)}</h2>
+                      ${flag ? `<img src="${flag}" alt="${escapeHtml(name)}" class="img-fluid mb-3" style="max-width:150px;">` : ""}
+                      <p><strong>Capitale:</strong> ${escapeHtml(capital)}</p>
+                      <p><strong>Regione:</strong> ${escapeHtml(region)} - ${escapeHtml(subregion)}</p>
+                      <p><strong>Popolazione:</strong> ${population}</p>
+                      <p><strong>Area:</strong> ${area}</p>
+                      <p><strong>Lingue:</strong> ${escapeHtml(languages)}</p>
+                      <p><strong>Valute:</strong> ${escapeHtml(currencies)}</p>`;
+          openDetailModal(name, html);
+        } catch (error) {
+          console.error(error);
+          openDetailModal("Errore", `<p class="text-danger">${error.message}</p>`);
+        }
+      };
+      
+      /* ----- Apertura della Modale ----- */
+      function openDetailModal(title, contentHTML) {
+        const modalTitle = document.getElementById("detailModalLabel");
+        const modalBody = document.getElementById("modalBodyContent");
+        modalTitle.textContent = title;
+        modalBody.innerHTML = contentHTML;
+        const modalElem = document.getElementById("detailModal");
+        const modal = new bootstrap.Modal(modalElem, { backdrop: "static" });
+        modal.show();
+      }
+      
+      /* ----- Funzione per Escape dei Caratteri HTML ----- */
+      function escapeHtml(text) {
+        if(typeof text !== "string") return text;
+        const map = { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#039;" };
+        return text.replace(/[&<>"']/g, m => map[m]);
+      }
+      
+      // Inizialmente carica i paesi
+      loadCountries();
+    });
+  </script>
+</body>
+</html>

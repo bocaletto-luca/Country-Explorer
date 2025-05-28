@@ -1,0 +1,308 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Country Explorer</title>
+  <!-- Bootstrap CSS per uno stile moderno e responsive -->
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css">
+  <style>
+    body {
+      background: #f4f4f4;
+      font-family: Arial, sans-serif;
+    }
+    /* Uniformità delle card */
+    .card {
+      box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+      transition: transform 0.2s;
+      margin-bottom: 20px;
+      height: 100%;
+    }
+    .card:hover {
+      transform: scale(1.03);
+    }
+    .card-img-top {
+      height: 150px;
+      object-fit: cover;
+    }
+    .card-body {
+      min-height: 60px;
+    }
+    .card-title {
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      margin-bottom: 0;
+    }
+    /* Menu con scroll orizzontale se necessario */
+    .filter-container {
+      overflow-x: auto;
+      white-space: nowrap;
+    }
+    .btn-group .btn.active {
+      background-color: #0d6efd;
+      color: white;
+    }
+    /* Footer */
+    footer {
+      margin-top: 30px;
+    }
+  </style>
+</head>
+<body>
+  <!-- Header centrato -->
+  <nav class="navbar navbar-expand-lg navbar-dark bg-dark mb-3">
+    <div class="container justify-content-center">
+      <a class="navbar-brand" href="#">Country Explorer</a>
+    </div>
+  </nav>
+
+  <!-- Menu per i filtri per regione -->
+  <div class="container mb-3">
+    <div class="d-flex justify-content-center">
+      <div class="btn-group filter-container flex-wrap" role="group" aria-label="Regioni dei Paesi">
+        <button type="button" class="btn btn-outline-primary active" data-region="all" onclick="filterCountries('all')">Tutti</button>
+        <button type="button" class="btn btn-outline-primary" data-region="Africa" onclick="filterCountries('Africa')">Africa</button>
+        <button type="button" class="btn btn-outline-primary" data-region="Americas" onclick="filterCountries('Americas')">Americas</button>
+        <button type="button" class="btn btn-outline-primary" data-region="Asia" onclick="filterCountries('Asia')">Asia</button>
+        <button type="button" class="btn btn-outline-primary" data-region="Europe" onclick="filterCountries('Europe')">Europe</button>
+        <button type="button" class="btn btn-outline-primary" data-region="Oceania" onclick="filterCountries('Oceania')">Oceania</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Container per le card e la paginazione -->
+  <div class="container">
+    <div class="row" id="countriesContainer">
+      <!-- Le card saranno inserite dinamicamente qui -->
+    </div>
+    <nav>
+      <ul id="pagination" class="pagination justify-content-center"></ul>
+    </nav>
+  </div>
+
+  <!-- Modal per i dettagli del paese -->
+  <div class="modal fade" id="countryModal" tabindex="-1" aria-labelledby="countryModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered modal-lg">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h5 class="modal-title" id="countryModalLabel">Dettagli Paese</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Chiudi"></button>
+        </div>
+        <div class="modal-body">
+          <div class="row">
+            <!-- Bandiera del paese -->
+            <div class="col-md-4">
+              <img id="modalFlag" src="" alt="Flag" class="img-fluid">
+            </div>
+            <!-- Informazioni aggiuntive -->
+            <div class="col-md-8" id="modalCountryDetails"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Footer -->
+  <footer class="bg-dark text-light text-center p-3">
+    <div class="container">
+      Bocaletto Luca
+    </div>
+  </footer>
+
+  <!-- Bootstrap Bundle JS (include Popper) -->
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
+  
+  <!-- Script JavaScript -->
+  <script>
+    let allCountries = [];   // Dati di tutti i paesi
+    let filteredCountries = [];  // Lista filtrata in base alla regione
+    const perPage = 20;      // Numero di card per pagina
+    let currentPage = 1;
+
+    // Al caricamento del DOM, recupera i paesi e inizializza
+    document.addEventListener('DOMContentLoaded', () => {
+      loadCountries();
+    });
+
+    // Recupera i dati dei paesi dall'API REST Countries
+    function loadCountries() {
+      document.getElementById('countriesContainer').innerHTML = '<div class="text-center my-3">Caricamento paesi...</div>';
+      fetch('https://restcountries.com/v3.1/all')
+        .then(response => {
+          if (!response.ok) {
+            throw new Error("Errore nel caricamento dei paesi");
+          }
+          return response.json();
+        })
+        .then(data => {
+          allCountries = data;
+          // Ordina alfabeticamente per nome comune
+          allCountries.sort((a, b) => a.name.common.localeCompare(b.name.common));
+          // Inizialmente mostra tutti i paesi
+          filterCountries('all');
+        })
+        .catch(error => {
+          console.error(error);
+          document.getElementById('countriesContainer').innerHTML = '<div class="text-center my-3 text-danger">Errore nel caricamento dei paesi</div>';
+        });
+    }
+
+    // Filtra i paesi in base alla regione (se "all", utilizza tutti i paesi)
+    function filterCountries(region) {
+      currentPage = 1;
+      // Attua lo stato active nei pulsanti del filtro
+      const buttons = document.querySelectorAll('.btn-group button');
+      buttons.forEach(btn => {
+        btn.classList.remove('active');
+        if(btn.getAttribute('data-region') === region) {
+          btn.classList.add('active');
+        }
+      });
+      if (region === 'all') {
+        filteredCountries = allCountries;
+      } else {
+        filteredCountries = allCountries.filter(country => country.region === region);
+      }
+      displayCountriesPage(currentPage);
+      updatePagination();
+    }
+
+    // Mostra la pagina dei paesi (client-side pagination)
+    function displayCountriesPage(page) {
+      currentPage = page;
+      const container = document.getElementById('countriesContainer');
+      container.innerHTML = '';
+      const start = (page - 1) * perPage;
+      const end = start + perPage;
+      const pageCountries = filteredCountries.slice(start, end);
+      pageCountries.forEach(country => {
+        const col = document.createElement('div');
+        col.className = 'col-md-3 col-sm-6 mb-3';
+        
+        const card = document.createElement('div');
+        card.className = 'card';
+        card.style.cursor = 'pointer';
+        
+        const img = document.createElement('img');
+        img.className = 'card-img-top';
+        // Utilizziamo il campo flags.png se disponibile
+        img.src = country.flags && country.flags.png ? country.flags.png : '';
+        img.alt = country.name.common;
+        card.appendChild(img);
+        
+        const cardBody = document.createElement('div');
+        cardBody.className = 'card-body text-center';
+        const title = document.createElement('h5');
+        title.className = 'card-title';
+        title.textContent = country.name.common;
+        cardBody.appendChild(title);
+        card.appendChild(cardBody);
+        
+        card.addEventListener('click', () => {
+          showCountryDetails(country);
+        });
+        col.appendChild(card);
+        container.appendChild(col);
+      });
+    }
+
+    // Aggiorna i pulsanti della paginazione
+    function updatePagination() {
+      const pagination = document.getElementById('pagination');
+      pagination.innerHTML = '';
+      const totalPages = Math.ceil(filteredCountries.length / perPage);
+      
+      // Bottone Previous
+      const prevLi = document.createElement('li');
+      prevLi.className = 'page-item ' + (currentPage === 1 ? 'disabled' : '');
+      const prevLink = document.createElement('a');
+      prevLink.className = 'page-link';
+      prevLink.href = '#';
+      prevLink.textContent = 'Previous';
+      prevLink.addEventListener('click', (e) => {
+        e.preventDefault();
+        if(currentPage > 1){
+          displayCountriesPage(currentPage - 1);
+          updatePagination();
+        }
+      });
+      prevLi.appendChild(prevLink);
+      pagination.appendChild(prevLi);
+      
+      // Bottone per ogni pagina
+      for(let i = 1; i <= totalPages; i++){
+        const li = document.createElement('li');
+        li.className = 'page-item ' + (i === currentPage ? 'active' : '');
+        const link = document.createElement('a');
+        link.className = 'page-link';
+        link.href = '#';
+        link.textContent = i;
+        link.addEventListener('click', (e) => {
+          e.preventDefault();
+          displayCountriesPage(i);
+          updatePagination();
+        });
+        li.appendChild(link);
+        pagination.appendChild(li);
+      }
+      
+      // Bottone Next
+      const nextLi = document.createElement('li');
+      nextLi.className = 'page-item ' + (currentPage === totalPages ? 'disabled' : '');
+      const nextLink = document.createElement('a');
+      nextLink.className = 'page-link';
+      nextLink.href = '#';
+      nextLink.textContent = 'Next';
+      nextLink.addEventListener('click', (e) => {
+        e.preventDefault();
+        if(currentPage < totalPages){
+          displayCountriesPage(currentPage + 1);
+          updatePagination();
+        }
+      });
+      nextLi.appendChild(nextLink);
+      pagination.appendChild(nextLi);
+    }
+
+    // Mostra i dettagli di un paese nel modal
+    function showCountryDetails(country) {
+      // Titolo e bandiera
+      document.getElementById('countryModalLabel').textContent = country.name.common;
+      document.getElementById('modalFlag').src = country.flags && country.flags.png ? country.flags.png : '';
+      
+      // Prepariamo i dettagli
+      let detailsHTML = `<p><strong>Nome Ufficiale:</strong> ${country.name.official}</p>`;
+      detailsHTML += `<p><strong>Regione:</strong> ${country.region}</p>`;
+      detailsHTML += `<p><strong>Subregione:</strong> ${country.subregion ? country.subregion : 'N/A'}</p>`;
+      detailsHTML += `<p><strong>Capitale:</strong> ${country.capital ? country.capital.join(', ') : 'N/A'}</p>`;
+      detailsHTML += `<p><strong>Popolazione:</strong> ${country.population.toLocaleString()}</p>`;
+      detailsHTML += `<p><strong>Area:</strong> ${country.area.toLocaleString()} km²</p>`;
+      
+      // Lingue (se presenti)
+      if(country.languages) {
+        const langs = Object.values(country.languages).join(', ');
+        detailsHTML += `<p><strong>Lingue:</strong> ${langs}</p>`;
+      }
+      // Valute (se presenti)
+      if(country.currencies) {
+        const currs = Object.values(country.currencies)
+          .map(c => c.name + (c.symbol ? ` (${c.symbol})` : ""))
+          .join(', ');
+        detailsHTML += `<p><strong>Valute:</strong> ${currs}</p>`;
+      }
+      // Fusi orari
+      if(country.timezones) {
+        detailsHTML += `<p><strong>Fusi orari:</strong> ${country.timezones.join(', ')}</p>`;
+      }
+      
+      document.getElementById('modalCountryDetails').innerHTML = detailsHTML;
+      
+      // Mostriamo il modal
+      const modalEl = document.getElementById('countryModal');
+      const modal = new bootstrap.Modal(modalEl);
+      modal.show();
+    }
+  </script>
+</body>
+</html>
